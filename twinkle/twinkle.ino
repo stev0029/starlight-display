@@ -15,6 +15,8 @@
 #define BASE_3_PIN 5
 
 // Starlight pins, individual LEDs
+#define NUM_STAR_MAIN 3
+#define NUM_STAR_SUB 3
 const uint8_t STAR_PINS[3][3] = {
     {6, 7, 8},
     {9, 10, 11},
@@ -76,6 +78,42 @@ void showStrips()
 
 
 
+// ------------------------- Star LED Interface -------------------------------
+
+// Stores the values / brightness (0-255) of the individual LED in a 2D array
+// `showStars()` to actually write the values to the pins
+// Other functions are getters and setters to access the 2D array
+
+uint8_t starValues[NUM_STAR_MAIN][NUM_STAR_SUB] = {0};
+
+void setStarValue(uint8_t main, uint8_t sub, uint8_t value)
+{
+    starValues[main][sub] = value;
+}
+
+uint8_t getStarValue(uint8_t main, uint8_t sub)
+{
+    return starValues[main][sub];
+}
+
+void showStars()
+{
+    for (int i = 0; i < NUM_STAR_MAIN; i++)
+        for (int j = 0; j < NUM_STAR_SUB; j++)
+            analogWrite(STAR_PINS[i][j], starValues[i][j]);
+}
+
+void setAllStars(uint8_t value)
+{
+    for (int i = 0; i < NUM_STAR_MAIN; i++)
+        for (int j = 0; j < NUM_STAR_SUB; j++)
+            setStarValue(i, j, value);
+}
+
+
+
+
+
 // ------------------------- Driver code ---------------------------------------
 
 // To allow non blocking animations / effects, don't use delay().
@@ -94,8 +132,9 @@ void loop()
 {
     int start = millis();
 
-    playSteadyState();
+    playTwinkleStar();
     showStrips();
+    showStars();
 
     while (millis() - start < TICK_MS) delay(1);
     tick++;
@@ -105,49 +144,29 @@ void loop()
 
 
 
-// --------------------- Implementation of rainbow cycle ----------------------
+// ---------------------- Twinkle Star Implementation -------------------------
 
-// Num of leds to complete a rainbow cycle
-#define BASE_RAINBOW_PERIOD 8
-#define CITY_RAINBOW_PERIOD 8
+#define LOWER_VALUE 128
+#define UPPER_VALUE 255
+#define DECREASE_RATE 1
+#define TWINKLE_INTERVAL 2
 
-// Length of ticks to complete a full cycle
-#define BASE_DURATION 16
-#define CITY_DURATION 16
-
-void playSteadyState()
+void playTwinkleStar()
 {
-    for (int i = 0; i < NUM_OF_BASE; i++)
-    {
-        for (int j = 0; j < BASE_NUM_PIXELS; j++)
-        {
-            baseStrips[i].setPixelColor(j,
-                wheel(i * 256 / BASE_RAINBOW_PERIOD + tick * 256 / BASE_DURATION));
-        }
-    }
-    for (int i = 0; i < NUM_OF_CITY; i++)
-    {
-        for (int j = 0; j < CITY_NUM_PIXELS; j++)
-        {
-            cityStrips[i].setPixelColor(j,
-                wheel(i * 256 / CITY_RAINBOW_PERIOD + tick * 256 / CITY_DURATION));
-        }
-    }
-}
+    if (tick == 0) setAllStars(LOWER_VALUE);
 
-uint32_t wheel(uint8_t pos) {
-    if (pos < 85)
+    // Dim every star each tick
+    for (int i = 0; i < NUM_STAR_MAIN; i++)
+        for (int j = 0; j < NUM_STAR_SUB; j++)
+        {
+            setStarValue(i, j, getStarValue(i, j) - DECREASE_RATE);
+            if (getStarValue(i, j) < LOWER_VALUE)
+                setStarValue(i, j, LOWER_VALUE);
+        }
+    
+    // Randomly determine which 'star' to twinkle
+    if (tick % TWINKLE_INTERVAL == random(TWINKLE_INTERVAL))
     {
-        return Adafruit_NeoPixel::Color(255 - pos * 3, pos * 3, 0);
-    }
-    else if (pos < 170)
-    {
-        pos -= 85;
-        return Adafruit_NeoPixel::Color(0, 255 - pos * 3, pos * 3);
-    }
-    else
-    {
-        pos -= 170;
-        return Adafruit_NeoPixel::Color(pos * 3, 0, 255 - pos * 3);
+        setStarValue(random(NUM_STAR_MAIN), random(NUM_STAR_SUB), UPPER_VALUE);
     }
 }
